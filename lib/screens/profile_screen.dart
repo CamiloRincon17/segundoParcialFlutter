@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:segundoparcialflutter/providers/auth_provider.dart';
 
@@ -10,7 +9,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider).value;
     final user = authState?.user;
-    final token = authState?.token ?? 'No hay token activo';
 
     final userName = user?.name ?? 'Invitado';
     final userEmail = user?.email ?? 'invitado@ejemplo.com';

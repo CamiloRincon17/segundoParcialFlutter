@@ -1,48 +1,49 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:segundoparcialflutter/models/product.dart';
+import 'package:segundoparcialflutter/providers/auth_provider.dart';
+import 'package:segundoparcialflutter/services/auth_interceptor.dart';
+
+final dioProvider = Provider<Dio>((ref) {
+  final dio = Dio(BaseOptions(
+    baseUrl: 'https://dummyjson.com',
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
+  dio.interceptors.add(AuthInterceptor(
+    onUnauthorized: () => ref.read(authProvider.notifier).logout(),
+  ));
+  return dio;
+});
+
+final apiServiceProvider =
+    Provider<ApiService>((ref) => ApiService(ref.watch(dioProvider)));
 
 class ApiService {
-  static const String baseUrl = 'https://dummyjson.com';
+  final Dio _dio;
+  ApiService(this._dio);
 
-  // Obtener productos de 10 en 10 usando paginación (limit y skip)
   Future<List<Product>> getProducts({int limit = 10, int skip = 0}) async {
-    final url = Uri.parse('$baseUrl/products?limit=$limit&skip=$skip');
-
     try {
-      final response =
-          await http.get(url).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        final List<dynamic> productsJson = data['products'] ?? [];
-        return productsJson.map((item) => Product.fromJson(item)).toList();
-      } else {
-        throw Exception('Error en el servidor: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error al conectar con la API: $e');
+      final res = await _dio.get(
+        '/products',
+        queryParameters: {'limit': limit, 'skip': skip},
+      );
+      final list = (res.data['products'] as List?) ?? [];
+      return list
+          .map((e) => Product.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(e.error?.toString() ?? 'Error inesperado');
     }
   }
 
-  // Crear un producto: devuelve el Product creado (con id asignado por la API)
   Future<Product?> createProduct(Product product) async {
-    final url = Uri.parse('$baseUrl/products/add');
-
     try {
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(product.toJson()),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        return Product.fromJson(json);
-      }
-    } catch (_) {}
-    return null;
+      final res = await _dio.post('/products/add', data: product.toJson());
+      return Product.fromJson(res.data as Map<String, dynamic>);
+    } on DioException {
+      return null;
+    }
   }
 }

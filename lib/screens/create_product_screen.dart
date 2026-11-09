@@ -49,7 +49,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   ];
 
   bool _isSaving = false;
-  final _apiService = ApiService();
+  ApiService get _apiService => ref.read(apiServiceProvider);
 
   @override
   void dispose() {

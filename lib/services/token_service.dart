@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:segundoparcialflutter/models/user.dart';
 
@@ -8,24 +8,27 @@ class TokenService {
   static const storage = FlutterSecureStorage();
   static const tokenKey = 'token';
 
-  // Login real contra DummyJSON Auth API
+  // Login real contra DummyJSON Auth API (usa cliente Dio sin interceptor)
   static Future<Map<String, dynamic>?> loginWithApi(
       String username, String password) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse('https://dummyjson.com/auth/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'username': username,
-              'password': password,
-              'expiresInMins': 10080,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://dummyjson.com',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+      final response = await dio.post(
+        '/auth/login',
+        data: {
+          'username': username,
+          'password': password,
+          'expiresInMins': 10080,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
       }
     } catch (_) {}
     return null;

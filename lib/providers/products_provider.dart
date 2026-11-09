@@ -44,7 +44,7 @@ class ProductsState {
 
 class ProductsNotifier extends Notifier<ProductsState> {
   static const int _pageSize = 10;
-  final _api = ApiService();
+  ApiService get _api => ref.read(apiServiceProvider);
 
   // Contador exclusivo para la API (no se altera al agregar productos locales)
   int _apiSkip = 0;
@@ -74,7 +74,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
       _apiSkip = 0;
       state = ProductsState(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
         hasMore: false,
       );
     }
