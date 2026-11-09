@@ -56,9 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Credenciales incorrectas.\n'
-                  'Locales: admin@correo.com / admin\n'
-                  'DummyJSON: emilys / emilyspass',
+                  'Credenciales incorrectas.',
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
@@ -195,7 +193,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               controller: _usernameController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                hintText: 'emilys  ó  admin@correo.com',
+                                hintText: 'Usa tu correo o nombre de usuario',
                                 prefixIcon:
                                     const Icon(Icons.person_outline_rounded),
                                 filled: true,
@@ -290,63 +288,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ? 'Ingrese su contraseña'
                                       : null,
                             ),
-                            const SizedBox(height: 20),
-
-                            // Credenciales de referencia
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer
-                                    .withValues(alpha: 0.4),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: theme.colorScheme.primary
-                                      .withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.shield_outlined,
-                                    size: 20,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Accesos disponibles:',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '• ${HardcodedData.email} / ${HardcodedData.password}  (local)\n'
-                                          '• ${HardcodedData.email2} / ${HardcodedData.password2}  (local)\n'
-                                          '• emilys / emilyspass  (DummyJSON API)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.white70
-                                                : Colors.black87,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             const SizedBox(height: 24),
-
                             // Botón de login
                             SizedBox(
                               width: double.infinity,
