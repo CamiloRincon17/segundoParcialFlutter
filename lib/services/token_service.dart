@@ -9,8 +9,7 @@ class TokenService {
 
   // Genera un token JWT simulado con los datos del usuario en el payload
   static String generateToken(String email, {String? name}) {
-    final matchedUser = HardcodedData.findByEmail(email);
-    final displayName = name ?? (matchedUser != null ? matchedUser.name : email.split('@').first.toUpperCase());
+    final displayName = name ?? HardcodedData.getNameForEmail(email);
 
     final payload = {
       'sub': email,

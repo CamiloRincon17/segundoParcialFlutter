@@ -16,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _obscurePassword = true;
-  bool _rememberMe = true;
 
   @override
   void initState() {
