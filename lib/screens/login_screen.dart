@@ -1,45 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:segundoparcialflutter/providers/auth_provider.dart';
 import 'package:segundoparcialflutter/router/app_router.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _emailController;
+  late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
   bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
-    // Credenciales quemadas pre-cargadas para facilidad de prueba
-    _emailController = TextEditingController(text: HardcodedData.email);
+    // Credenciales quemadas pre-cargadas (usuario 1 local)
+    _usernameController = TextEditingController(text: HardcodedData.email);
     _passwordController = TextEditingController(text: HardcodedData.password);
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final auth = context.read<AuthProvider>();
-    final success = await auth.login(
-      _emailController.text,
-      _passwordController.text,
-    );
+    final success = await ref
+        .read(authProvider.notifier)
+        .login(_usernameController.text.trim(), _passwordController.text.trim());
 
     if (!mounted) return;
 
@@ -58,7 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Credenciales incorrectas.\nUsa: admin@correo.com / admin',
+                  'Credenciales incorrectas.\n'
+                  'Locales: admin@correo.com / admin\n'
+                  'DummyJSON: emilys / emilyspass',
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
@@ -73,299 +73,346 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final isLoading = context.watch<AuthProvider>().isLoading;
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.value?.isLoading ?? false;
 
     return Scaffold(
       body: Stack(
         children: [
-          // Fondo decorativo con gradiente sutil y formas abstractas
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.15),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -80,
-            left: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    theme.colorScheme.secondary.withValues(alpha: isDark ? 0.2 : 0.12),
-                    Colors.transparent,
-                  ],
-                ),
+          // Fondo degradado
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.blue.shade900.withValues(alpha: 0.6),
+                        Colors.black,
+                      ]
+                    : [
+                        Colors.blue.shade50,
+                        Colors.white,
+                      ],
               ),
             ),
           ),
 
-          // Contenido principal centrado
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Card(
-                  elevation: isDark ? 8 : 12,
-                  shadowColor: Colors.black.withValues(alpha: 0.15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    side: BorderSide(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.black.withValues(alpha: 0.05),
+          // Círculo decorativo superior
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Card(
+                    elevation: isDark ? 4 : 6,
+                    shadowColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Logo / Badge con diseño moderno
-                          Center(
-                            child: Container(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Logo / Icono
+                            Container(
                               width: 72,
                               height: 72,
                               decoration: BoxDecoration(
+                                shape: BoxShape.circle,
                                 gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
                                   colors: [
                                     theme.colorScheme.primary,
                                     theme.colorScheme.tertiary,
                                   ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                borderRadius: BorderRadius.circular(22),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.storefront_rounded,
-                                size: 38,
+                                size: 36,
                                 color: Colors.white,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 20),
 
-                          // Títulos y bienvenida
-                          Text(
-                            '¡Bienvenido de nuevo!',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Ingresa tus credenciales para acceder al sistema',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-
-                         
-                          const SizedBox(height: 24),
-
-                          // Campo: Correo Electrónico
-                          Text(
-                            'Correo electrónico',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              hintText: 'ejemplo@correo.com',
-                              prefixIcon: const Icon(Icons.mail_outline_rounded),
-                              filled: true,
-                              fillColor: isDark
-                                  ? Colors.white.withValues(alpha: 0.04)
-                                  : Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 2,
-                                ),
+                            Text(
+                              '¡Bienvenido de nuevo!',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Por favor ingrese su correo';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 18),
-
-                          // Campo: Contraseña
-                          Text(
-                            'Contraseña',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              hintText: 'Ingresa tu contraseña',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                              filled: true,
-                              fillColor: isDark
-                                  ? Colors.white.withValues(alpha: 0.04)
-                                  : Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 2,
-                                ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Ingresa tus credenciales para acceder',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                             ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Por favor ingrese su contraseña';
-                              }
-                              return null;
-                            },
-                          ),
+                            const SizedBox(height: 28),
 
-                        
-                          const SizedBox(height: 24),
-
-                          // Botón Principal de Acceso (con gradiente y sombras)
-                          SizedBox(
-                            height: 52,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.colorScheme.primary,
-                                foregroundColor: theme.colorScheme.onPrimary,
-                                elevation: 3,
-                                shadowColor: theme.colorScheme.primary.withValues(alpha: 0.5),
-                                shape: RoundedRectangleBorder(
+                            // Campo: Usuario / Correo
+                            Text(
+                              'Usuario o correo',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _usernameController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                hintText: 'emilys  ó  admin@correo.com',
+                                prefixIcon:
+                                    const Icon(Icons.person_outline_rounded),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.white.withValues(alpha: 0.04)
+                                    : Colors.grey.shade50,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? Colors.grey.shade800
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: theme.colorScheme.primary,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
-                              onPressed: isLoading ? null : _handleLogin,
-                              child: isLoading
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                              validator: (val) =>
+                                  val == null || val.trim().isEmpty
+                                      ? 'Ingrese su usuario o correo'
+                                      : null,
+                            ),
+                            const SizedBox(height: 18),
+
+                            // Campo: Contraseña
+                            Text(
+                              'Contraseña',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: 'Ingresa tu contraseña',
+                                prefixIcon:
+                                    const Icon(Icons.lock_outline_rounded),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: isDark
+                                    ? Colors.white.withValues(alpha: 0.04)
+                                    : Colors.grey.shade50,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? Colors.grey.shade800
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: theme.colorScheme.primary,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              validator: (val) =>
+                                  val == null || val.trim().isEmpty
+                                      ? 'Ingrese su contraseña'
+                                      : null,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Credenciales de referencia
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.shield_outlined,
+                                    size: 20,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Iniciar Sesión',
+                                          'Accesos disponibles:',
                                           style: TextStyle(
-                                            fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.3,
+                                            fontSize: 11,
+                                            color: theme.colorScheme.primary,
                                           ),
                                         ),
-                                        SizedBox(width: 8),
-                                        Icon(Icons.arrow_forward_rounded, size: 20),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '• ${HardcodedData.email} / ${HardcodedData.password}  (local)\n'
+                                          '• ${HardcodedData.email2} / ${HardcodedData.password2}  (local)\n'
+                                          '• emilys / emilyspass  (DummyJSON API)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? Colors.white70
+                                                : Colors.black87,
+                                          ),
+                                        ),
                                       ],
                                     ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Pie de página de seguridad
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.verified_user_outlined,
-                                size: 16,
-                                color: Colors.grey.shade500,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Botón de login
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary,
+                                  foregroundColor: theme.colorScheme.onPrimary,
+                                  elevation: 3,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed: isLoading ? null : _handleLogin,
+                                child: isLoading
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Iniciar Sesión',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Icon(Icons.arrow_forward_rounded,
+                                              size: 20),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Pie de seguridad
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.verified_user_outlined,
+                                    size: 14,
+                                    color: Colors.grey.shade500),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Protegido con JWT + FlutterSecureStorage',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

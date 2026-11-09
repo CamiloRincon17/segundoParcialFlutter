@@ -1,90 +1,126 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:segundoparcialflutter/models/user.dart';
 import 'package:segundoparcialflutter/services/token_service.dart';
 
 export 'package:segundoparcialflutter/models/user.dart';
 
-class AuthProvider extends ChangeNotifier {
-  final TokenService _tokenService = TokenService();
+// Estado de autenticación
+class AuthState {
+  final User? user;
+  final String? token;
+  final bool isLoading;
+  final bool isInitializing;
 
-  User? _user;
-  String? _token;
-  bool _isLoading = false;
-  bool _isCheckingAuth = true;
+  const AuthState({
+    this.user,
+    this.token,
+    this.isLoading = false,
+    this.isInitializing = true,
+  });
 
-  User? get user => _user;
-  String? get token => _token;
-  bool get isAuthenticated => _user != null && _token != null;
-  bool get isLoading => _isLoading;
-  bool get isCheckingAuth => _isCheckingAuth;
+  bool get isAuthenticated => user != null && token != null;
 
-  AuthProvider() {
-    _checkInitialAuth();
+  AuthState copyWith({
+    User? user,
+    String? token,
+    bool? isLoading,
+    bool? isInitializing,
+    bool clearUser = false,
+    bool clearToken = false,
+  }) {
+    return AuthState(
+      user: clearUser ? null : (user ?? this.user),
+      token: clearToken ? null : (token ?? this.token),
+      isLoading: isLoading ?? this.isLoading,
+      isInitializing: isInitializing ?? this.isInitializing,
+    );
+  }
+}
+
+class AuthNotifier extends AsyncNotifier<AuthState> {
+  final _tokenService = TokenService();
+
+  @override
+  Future<AuthState> build() async {
+    return _checkInitialAuth();
   }
 
-  // Verifica el token en FlutterSecureStorage al iniciar o recargar
-  Future<void> _checkInitialAuth() async {
-    _isCheckingAuth = true;
+  Future<AuthState> _checkInitialAuth() async {
     try {
       final storedToken = await _tokenService.getToken();
-
       if (storedToken != null && storedToken.isNotEmpty) {
-        _token = storedToken;
-        _user = TokenService.getUserFromToken(storedToken);
-      } else {
-        // Si el usuario eliminó el token manualmente, limpia el estado
-        _token = null;
-        _user = null;
+        final user = TokenService.getUserFromToken(storedToken);
+        return AuthState(
+          user: user,
+          token: storedToken,
+          isInitializing: false,
+        );
       }
-    } catch (e) {
-      debugPrint('Error en _checkInitialAuth: $e');
-      _token = null;
-      _user = null;
-    } finally {
-      _isCheckingAuth = false;
-      notifyListeners();
-    }
+    } catch (_) {}
+    return const AuthState(isInitializing: false);
   }
 
-  // Login: genera el token y lo guarda en FlutterSecureStorage
-  Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    notifyListeners();
+  // Login: primero intenta contra DummyJSON API, si falla valida localmente
+  Future<bool> login(String emailOrUsername, String password) async {
+    final prev = state.value ?? const AuthState(isInitializing: false);
+    state = AsyncData(prev.copyWith(isLoading: true, isInitializing: false));
 
     try {
-      if (email.trim().isNotEmpty && password.trim().isNotEmpty) {
-        final userEmail = email.trim();
+      // 1. Intenta login con DummyJSON Auth API
+      final apiResult =
+          await TokenService.loginWithApi(emailOrUsername, password);
 
-        // 1. Generar token JWT simulado con los datos en el payload
-        final generatedToken = TokenService.generateToken(userEmail);
+      if (apiResult != null) {
+        final apiToken = apiResult['accessToken']?.toString() ??
+            apiResult['token']?.toString() ?? '';
+        final apiName = apiResult['firstName'] != null
+            ? '${apiResult['firstName']} ${apiResult['lastName'] ?? ''}'.trim()
+            : apiResult['username']?.toString() ?? emailOrUsername;
+        final apiEmail = apiResult['email']?.toString() ?? emailOrUsername;
 
-        // 2. Guardar ÚNICAMENTE el token en FlutterSecureStorage
-        await _tokenService.saveToken(generatedToken);
+        final token = apiToken.isNotEmpty
+            ? apiToken
+            : TokenService.generateToken(apiEmail, name: apiName);
 
-        _token = generatedToken;
-        _user = TokenService.getUserFromToken(generatedToken);
-        _isLoading = false;
-        notifyListeners();
+        await _tokenService.saveToken(token);
+
+        final user = User(name: apiName, email: apiEmail);
+        state = AsyncData(AuthState(
+          user: user,
+          token: token,
+          isLoading: false,
+          isInitializing: false,
+        ));
         return true;
       }
-    } catch (e) {
-      debugPrint('Error durante login: $e');
-    }
 
-    _isLoading = false;
-    notifyListeners();
+      // 2. Fallback: validar contra credenciales quemadas locales
+      final isValid = HardcodedData.validate(emailOrUsername, password);
+      if (isValid) {
+        final name = HardcodedData.getNameForEmail(emailOrUsername);
+        final token = TokenService.generateToken(emailOrUsername, name: name);
+        await _tokenService.saveToken(token);
+
+        final user = User(name: name, email: emailOrUsername);
+        state = AsyncData(AuthState(
+          user: user,
+          token: token,
+          isLoading: false,
+          isInitializing: false,
+        ));
+        return true;
+      }
+    } catch (_) {}
+
+    state = AsyncData(prev.copyWith(isLoading: false, isInitializing: false));
     return false;
   }
 
-  // Cerrar sesión y eliminar el token de FlutterSecureStorage
   Future<void> logout() async {
-    try {
-      await _tokenService.clearToken();
-    } catch (e) {
-      debugPrint('Error en logout: $e');
-    }
-    _token = null;
-    _user = null;
-    notifyListeners();
+    await _tokenService.clearToken();
+    state = const AsyncData(AuthState(isInitializing: false));
   }
 }
+
+final authProvider =
+    AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);

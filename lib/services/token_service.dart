@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:segundoparcialflutter/models/user.dart';
 
@@ -7,15 +8,35 @@ class TokenService {
   static const storage = FlutterSecureStorage();
   static const tokenKey = 'token';
 
-  // Genera un token JWT simulado con los datos del usuario en el payload
+  // Login real contra DummyJSON Auth API
+  static Future<Map<String, dynamic>?> loginWithApi(
+      String username, String password) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://dummyjson.com/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'password': password, 'expiresInMins': 10080}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Genera un token JWT simulado (fallback para usuarios quemados locales)
   static String generateToken(String email, {String? name}) {
     final displayName = name ?? HardcodedData.getNameForEmail(email);
-
     final payload = {
       'sub': email,
       'name': displayName,
       'iat': DateTime.now().millisecondsSinceEpoch,
-      'exp': DateTime.now().add(const Duration(days: 7)).millisecondsSinceEpoch,
+      'exp': DateTime.now()
+          .add(const Duration(days: 7))
+          .millisecondsSinceEpoch,
       'issuer': 'segundoParcialFlutter_auth',
     };
     final jsonStr = jsonEncode(payload);
@@ -23,7 +44,7 @@ class TokenService {
     return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.$base64Payload.s3cur3_s1gn4tur3';
   }
 
-  // Extrae el usuario directamente del JWT sin necesitar claves extras en storage
+  // Extrae el usuario directamente del JWT
   static User? getUserFromToken(String token) {
     try {
       final parts = token.split('.');
@@ -31,8 +52,12 @@ class TokenService {
         final normalized = base64Url.normalize(parts[1]);
         final decoded = utf8.decode(base64Url.decode(normalized));
         final json = jsonDecode(decoded) as Map<String, dynamic>;
-        final email = json['sub'] as String? ?? 'admin@correo.com';
-        final name = json['name'] as String? ?? email.split('@').first.toUpperCase();
+        final email = json['sub'] as String? ??
+            json['email'] as String? ??
+            'admin@correo.com';
+        final name = json['name'] as String? ??
+            json['username'] as String? ??
+            email.split('@').first.toUpperCase();
         return User(name: name, email: email);
       }
     } catch (_) {}
@@ -41,18 +66,9 @@ class TokenService {
 
   // Guarda ÚNICAMENTE con FlutterSecureStorage bajo la clave 'token'
   Future<void> saveToken(String token) async {
-    // Guarda exclusivamente en FlutterSecureStorage
     await storage.write(key: tokenKey, value: token);
-
-    // Limpia claves antiguas de SharedPreferences / LocalStorage si existían
-    try {
-      await storage.delete(key: 'user_data');
-    } catch (_) {}
-
-    debugPrint('==================================================');
-    debugPrint('🔑 FLUTTER_SECURE_STORAGE: token guardado');
-    debugPrint(token);
-    debugPrint('==================================================');
+    // No se imprime el token por seguridad
+    debugPrint('🔑 Token guardado en FlutterSecureStorage');
   }
 
   // Lee ÚNICAMENTE desde FlutterSecureStorage
@@ -68,7 +84,6 @@ class TokenService {
   Future<void> clearToken() async {
     try {
       await storage.delete(key: tokenKey);
-      await storage.delete(key: 'user_data');
     } catch (_) {}
   }
 

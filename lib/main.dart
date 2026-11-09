@@ -1,73 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart' hide Consumer;
-import 'package:segundoparcialflutter/providers/auth_provider.dart';
 import 'package:segundoparcialflutter/providers/theme_provider.dart';
 import 'package:segundoparcialflutter/router/app_router.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    ProviderScope(
-      child: ChangeNotifierProvider(
-        create: (_) => AuthProvider(),
-        child: const MainApp(),
-      ),
-    ),
-  );
+  runApp(const ProviderScope(child: MainApp()));
 }
 
-class MainApp extends ConsumerStatefulWidget {
+class MainApp extends ConsumerWidget {
   const MainApp({super.key});
 
   @override
-  ConsumerState<MainApp> createState() => _MainAppState();
-}
-
-class _MainAppState extends ConsumerState<MainApp> {
-  late final GoRouter _router;
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = context.read<AuthProvider>();
-    _router = createRouter(auth);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Escucha el modo de tema desde Riverpod
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(themeProvider);
+    final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'App Segundo Parcial',
       debugShowCheckedModeBanner: false,
-      routerConfig: _router,
-
-      // Modo de tema controlado con Riverpod
+      routerConfig: router,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-
-      // Tema Claro
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
         colorSchemeSeed: Colors.blue,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 1,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 1),
       ),
-
-      // Tema Oscuro
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
         colorSchemeSeed: Colors.blue,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 1,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 1),
       ),
     );
   }

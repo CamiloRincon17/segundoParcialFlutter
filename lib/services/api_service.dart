@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'package:segundoparcialflutter/models/product.dart';
 
 class ApiService {
-  // DummyJSON cuenta con casi 200 productos y soporte nativo de paginación
   static const String baseUrl = 'https://dummyjson.com';
 
   // Obtener productos de 10 en 10 usando paginación (limit y skip)
@@ -11,9 +10,8 @@ class ApiService {
     final url = Uri.parse('$baseUrl/products?limit=$limit&skip=$skip');
 
     try {
-      final response = await http
-          .get(url)
-          .timeout(const Duration(seconds: 10));
+      final response =
+          await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -27,8 +25,8 @@ class ApiService {
     }
   }
 
-  // Crear un producto nuevo
-  Future<bool> createProduct(Product product) async {
+  // Crear un producto: devuelve el Product creado (con id asignado por la API)
+  Future<Product?> createProduct(Product product) async {
     final url = Uri.parse('$baseUrl/products/add');
 
     try {
@@ -40,9 +38,11 @@ class ApiService {
           )
           .timeout(const Duration(seconds: 10));
 
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      return false;
-    }
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return Product.fromJson(json);
+      }
+    } catch (_) {}
+    return null;
   }
 }

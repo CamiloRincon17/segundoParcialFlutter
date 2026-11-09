@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart' hide Consumer;
 import 'package:segundoparcialflutter/providers/auth_provider.dart';
+
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
+    final authState = ref.watch(authProvider).value;
+    final user = authState?.user;
+    final token = authState?.token ?? 'No hay token activo';
 
     final userName = user?.name ?? 'Invitado';
     final userEmail = user?.email ?? 'invitado@ejemplo.com';
-    final token = auth.token ?? 'No hay token activo';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi Perfil'),
-      ),
+      appBar: AppBar(title: const Text('Mi Perfil')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -26,42 +24,40 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                // Avatar grande
                 CircleAvatar(
                   radius: 50,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primaryContainer,
                   child: Text(
-                    userName.isNotEmpty ? userName[0] : 'U',
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
                     style: TextStyle(
                       fontSize: 44,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onPrimaryContainer,
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Nombre y correo
                 Text(
                   userName,
                   style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   userEmail,
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
+                      fontSize: 14, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 12),
                 Chip(
-                  avatar: const Icon(Icons.verified, size: 18, color: Colors.green),
+                  avatar: const Icon(Icons.verified,
+                      size: 18, color: Colors.green),
                   label: const Text('Sesión Activa'),
-                  backgroundColor: Colors.green.withValues(alpha: 0.15),
+                  backgroundColor:
+                      Colors.green.withValues(alpha: 0.15),
                   side: BorderSide.none,
                 ),
                 const SizedBox(height: 24),
@@ -70,8 +66,7 @@ class ProfileScreen extends ConsumerWidget {
                 Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                      borderRadius: BorderRadius.circular(16)),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -80,32 +75,94 @@ class ProfileScreen extends ConsumerWidget {
                         const Text(
                           'Información de la Cuenta',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
                         ),
                         const Divider(height: 24),
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person),
-                          ),
+                          leading:
+                              const CircleAvatar(child: Icon(Icons.person)),
                           title: const Text('Nombre Completo'),
                           subtitle: Text(userName),
                         ),
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: const CircleAvatar(
-                            child: Icon(Icons.alternate_email),
-                          ),
-                          title: const Text('Correo Electrónico'),
+                              child: Icon(Icons.alternate_email)),
+                          title: const Text('Correo / Usuario'),
                           subtitle: Text(userEmail),
                         ),
                       ],
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
 
+                // Tarjeta: FlutterSecureStorage.token
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.security,
+                                    size: 20, color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text(
+                                  'FlutterSecureStorage.token',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 20),
+                              tooltip: 'Copiar Token',
+                              onPressed: () {
+                                Clipboard.setData(
+                                    ClipboardData(text: token));
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Token copiado'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SelectableText(
+                            token,
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
             ),
@@ -115,4 +172,3 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 }
-

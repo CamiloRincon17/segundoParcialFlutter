@@ -1,29 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:segundoparcialflutter/models/product.dart';
 import 'package:segundoparcialflutter/services/api_service.dart';
 
-class CreateProductScreen extends StatefulWidget {
+class CreateProductScreen extends ConsumerStatefulWidget {
   const CreateProductScreen({super.key});
 
   @override
-  State<CreateProductScreen> createState() => _CreateProductScreenState();
+  ConsumerState<CreateProductScreen> createState() =>
+      _CreateProductScreenState();
 }
 
-class _CreateProductScreenState extends State<CreateProductScreen> {
+class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
+  // Imagen de muestra de DummyJSON (no depende de FakeStoreAPI)
   final _imageController = TextEditingController(
-    text: 'https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg',
+    text: 'https://cdn.dummyjson.com/product-images/1/thumbnail.jpg',
   );
 
-  String _selectedCategory = "electronics";
+  // Categorías reales de DummyJSON
+  String _selectedCategory = 'smartphones';
   final List<String> _categories = [
-    "electronics",
-    "jewelery",
-    "men's clothing",
-    "women's clothing",
+    'smartphones',
+    'laptops',
+    'fragrances',
+    'skincare',
+    'groceries',
+    'home-decoration',
+    'furniture',
+    'tops',
+    'womens-dresses',
+    'womens-shoes',
+    'mens-shirts',
+    'mens-shoes',
+    'mens-watches',
+    'womens-watches',
+    'womens-bags',
+    'womens-jewellery',
+    'sunglasses',
+    'automotive',
+    'motorcycle',
+    'lighting',
   ];
 
   bool _isSaving = false;
@@ -38,9 +59,8 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     super.dispose();
   }
 
-  void _submitForm() async {
+  Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSaving = true);
 
     final newProduct = Product(
@@ -51,19 +71,21 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       image: _imageController.text.trim(),
     );
 
-    final success = await _apiService.createProduct(newProduct);
+    // createProduct ahora devuelve el Product creado (con id de DummyJSON)
+    final created = await _apiService.createProduct(newProduct);
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (created != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('¡Producto creado exitosamente!'),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.of(context).pop(true);
+      // Devuelve el Product para que HomeScreen lo agregue localmente
+      context.pop(created);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -77,9 +99,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nuevo Producto'),
-      ),
+      appBar: AppBar(title: const Text('Nuevo Producto')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -100,7 +120,8 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   labelText: 'Precio (\$)',
                   prefixIcon: Icon(Icons.attach_money),
@@ -108,7 +129,9 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) return 'Ingrese un precio';
-                  if (double.tryParse(val.trim()) == null) return 'Ingrese un número válido';
+                  if (double.tryParse(val.trim()) == null) {
+                    return 'Ingrese un número válido';
+                  }
                   return null;
                 },
               ),
@@ -116,15 +139,12 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
                 decoration: const InputDecoration(
-                  labelText: 'Categoría',
+                  labelText: 'Categoría (DummyJSON)',
                   prefixIcon: Icon(Icons.category),
                   border: OutlineInputBorder(),
                 ),
                 items: _categories.map((cat) {
-                  return DropdownMenuItem(
-                    value: cat,
-                    child: Text(cat),
-                  );
+                  return DropdownMenuItem(value: cat, child: Text(cat));
                 }).toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedCategory = val);
@@ -139,7 +159,9 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (val) =>
-                    val == null || val.trim().isEmpty ? 'Ingrese una URL de imagen' : null,
+                    val == null || val.trim().isEmpty
+                        ? 'Ingrese una URL de imagen'
+                        : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -150,9 +172,10 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                   prefixIcon: Icon(Icons.description),
                   border: OutlineInputBorder(),
                 ),
-                validator: (val) => val == null || val.trim().isEmpty
-                    ? 'Ingrese una descripción'
-                    : null,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty
+                        ? 'Ingrese una descripción'
+                        : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(

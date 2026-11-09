@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:segundoparcialflutter/models/product.dart';
+import 'package:segundoparcialflutter/providers/products_provider.dart';
 import 'package:segundoparcialflutter/providers/theme_provider.dart';
-import 'package:segundoparcialflutter/screens/create_product_screen.dart';
-import 'package:segundoparcialflutter/services/api_service.dart';
+import 'package:segundoparcialflutter/router/app_router.dart';
 import 'package:segundoparcialflutter/widgets/app_drawer.dart';
 import 'package:segundoparcialflutter/widgets/produc_card.dart';
 
@@ -16,21 +17,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
-
-  final List<Product> _products = [];
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
-  String? _errorMessage;
-
-  static const int _pageSize = 10;
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialProducts();
     _scrollController.addListener(_onScroll);
   }
 
@@ -40,71 +31,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  // Detecta cuando el usuario llega al final del scroll para cargar 10 más
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 250) {
-      if (!_isLoadingMore && _hasMore && !_isLoading) {
-        _fetchMoreProducts();
-      }
+      ref.read(productsProvider.notifier).fetchMore();
     }
   }
 
-  // Carga inicial (primeros 10 productos)
-  Future<void> _fetchInitialProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final newItems = await _apiService.getProducts(limit: _pageSize, skip: 0);
-      if (!mounted) return;
-
-      setState(() {
-        _products.clear();
-        _products.addAll(newItems);
-        _isLoading = false;
-        _hasMore = newItems.length >= _pageSize;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
-    }
-  }
-
-  // Carga incremental (los siguientes 10 productos)
-  Future<void> _fetchMoreProducts() async {
-    setState(() {
-      _isLoadingMore = true;
-    });
-
-    try {
-      final nextSkip = _products.length;
-      final newItems =
-          await _apiService.getProducts(limit: _pageSize, skip: nextSkip);
-
-      if (!mounted) return;
-
-      setState(() {
-        _products.addAll(newItems);
-        _isLoadingMore = false;
-        if (newItems.length < _pageSize) {
-          _hasMore = false;
-        }
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoadingMore = false;
-      });
-    }
-  }
-
-  void _showProductDetails(Product product) {
+  void _showProductDetails(BuildContext context, Product product) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -116,8 +50,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         expand: false,
-        builder: (_, scrollController) => SingleChildScrollView(
-          controller: scrollController,
+        builder: (_, scrollCtrl) => SingleChildScrollView(
+          controller: scrollCtrl,
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Image.network(
                     product.image,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Icon(
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.image_not_supported,
                       size: 60,
                       color: Colors.grey,
@@ -152,9 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Text(
                 product.title,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -181,10 +113,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               const SizedBox(height: 4),
-              Text(
-                product.description,
-                style: const TextStyle(height: 1.4),
-              ),
+              Text(product.description,
+                  style: const TextStyle(height: 1.4)),
             ],
           ),
         ),
@@ -195,41 +125,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = ref.watch(themeProvider);
+    final productsState = ref.watch(productsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Catálogo de Productos'),
         actions: [
           IconButton(
-            icon: Icon(
-              isDarkMode ? Icons.light_mode : Icons.dark_mode,
-            ),
+            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
             tooltip: isDarkMode ? 'Modo Claro' : 'Modo Oscuro',
-            onPressed: () {
-              ref.read(themeProvider.notifier).toggleTheme();
-            },
+            onPressed: () =>
+                ref.read(themeProvider.notifier).toggleTheme(),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Recargar',
-            onPressed: _fetchInitialProducts,
+            onPressed: () =>
+                ref.read(productsProvider.notifier).fetchInitial(),
           ),
         ],
       ),
       drawer: const AppDrawer(),
       body: RefreshIndicator(
-        onRefresh: _fetchInitialProducts,
-        child: _buildBody(),
+        onRefresh: () =>
+            ref.read(productsProvider.notifier).fetchInitial(),
+        child: _buildBody(context, productsState),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final created = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(
-              builder: (_) => const CreateProductScreen(),
-            ),
-          );
-          if (created == true) {
-            _fetchInitialProducts();
+          // Ambas vías (FAB y drawer) usan context.push<Product>
+          final created =
+              await context.push<Product>(AppRoutes.createProduct);
+          if (created != null) {
+            ref
+                .read(productsProvider.notifier)
+                .addProductLocally(created);
           }
         },
         icon: const Icon(Icons.add),
@@ -238,79 +168,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildBody() {
-    // 1. Efecto Esqueleto (Skeleton) mientras carga o si el internet es lento
-    if (_isLoading) {
-      final skeletonMockList = List.generate(
+  Widget _buildBody(BuildContext context, ProductsState state) {
+    // 1. Skeleton inicial
+    if (state.isLoading) {
+      final mockList = List.generate(
         6,
         (i) => Product(
           id: i,
           title: 'Cargando nombre del producto...',
           price: 89.99,
-          description: 'Descripción provisional del producto mientras se descargan los datos...',
+          description: 'Descripción provisional...',
           category: 'CATEGORÍA',
           image: '',
         ),
       );
-
       return Skeletonizer(
         enabled: true,
         child: ListView.builder(
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: skeletonMockList.length,
-          itemBuilder: (context, index) {
-            return ProductCard(product: skeletonMockList[index]);
-          },
+          itemCount: mockList.length,
+          itemBuilder: (_, i) => ProductCard(product: mockList[i]),
         ),
       );
     }
 
-    // 2. Si ocurrió un error de red
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.cloud_off, size: 60, color: Colors.red),
-              const SizedBox(height: 12),
-              const Text(
-                'Sin conexión o error al conectar con la API',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _fetchInitialProducts,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-              ),
-            ],
+    // 2. Error con RefreshIndicator funcional (ListView para que el pull funcione)
+    if (state.errorMessage != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off, size: 60, color: Colors.red),
+                const SizedBox(height: 12),
+                const Text(
+                  'Sin conexión o error al conectar con la API',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    state.errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      ref.read(productsProvider.notifier).fetchInitial(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
-    if (_products.isEmpty) {
-      return const Center(
-        child: Text('No hay productos disponibles.'),
+    // 3. Lista vacía (con pull-to-refresh funcional)
+    if (state.products.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 200),
+          Center(child: Text('No hay productos disponibles.')),
+        ],
       );
     }
 
-    // 3. Lista con scroll infinito y efecto esqueleto al cargar los siguientes 10
+    // 4. Lista con scroll infinito + skeleton al cargar más
     return ListView.builder(
       controller: _scrollController,
-      itemCount: _products.length + (_hasMore ? 1 : 0),
+      itemCount: state.products.length + (state.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        // Al final de la lista, muestra un skeleton card mientras descarga los siguientes 10
-        if (index == _products.length) {
-          final skeletonNext = Product(
+        if (index == state.products.length) {
+          // Skeleton card mientras carga los siguientes 10
+          final skeleton = Product(
             id: 9999,
             title: 'Cargando más productos...',
             price: 50.00,
@@ -320,14 +262,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
           return Skeletonizer(
             enabled: true,
-            child: ProductCard(product: skeletonNext),
+            child: ProductCard(product: skeleton),
           );
         }
-
-        final product = _products[index];
+        final product = state.products[index];
         return ProductCard(
           product: product,
-          onTap: () => _showProductDetails(product),
+          onTap: () => _showProductDetails(context, product),
         );
       },
     );
