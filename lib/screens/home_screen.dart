@@ -38,6 +38,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  // Verifica si la pantalla es muy alta o corta y la primera carga no llena la pantalla
+  void _checkIfNeedsMoreContent() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = ref.read(productsProvider);
+      if (_scrollController.hasClients &&
+          _scrollController.position.maxScrollExtent <= 50 &&
+          state.hasMore &&
+          !state.isLoading &&
+          !state.isLoadingMore &&
+          !state.hasLoadMoreError &&
+          state.products.isNotEmpty) {
+        ref.read(productsProvider.notifier).fetchMore();
+      }
+    });
+  }
+
   void _showProductDetails(BuildContext context, Product product) {
     showModalBottomSheet(
       context: context,
@@ -86,7 +103,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Text(
                 product.title,
                 style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -127,6 +146,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isDarkMode = ref.watch(themeProvider);
     final productsState = ref.watch(productsProvider);
 
+    _checkIfNeedsMoreContent();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Catálogo de Productos'),
@@ -153,7 +174,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // Ambas vías (FAB y drawer) usan context.push<Product>
           final created =
               await context.push<Product>(AppRoutes.createProduct);
           if (created != null) {
@@ -177,7 +197,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           id: i,
           title: 'Cargando nombre del producto...',
           price: 89.99,
-          description: 'Descripción provisional...',
+          description: 'Descripción provisional mientras descarga...',
           category: 'CATEGORÍA',
           image: '',
         ),
@@ -192,7 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    // 2. Error con RefreshIndicator funcional (ListView para que el pull funcione)
+    // 2. Error de carga inicial con pull-to-refresh
     if (state.errorMessage != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -207,7 +227,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const Text(
                   'Sin conexión o error al conectar con la API',
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -217,7 +239,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     state.errorMessage!,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 12, color: Colors.grey),
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -234,7 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    // 3. Lista vacía (con pull-to-refresh funcional)
+    // 3. Lista vacía con pull-to-refresh
     if (state.products.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -245,13 +269,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    // 4. Lista con scroll infinito + skeleton al cargar más
+    // 4. Lista con scroll infinito
     return ListView.builder(
       controller: _scrollController,
       itemCount: state.products.length + (state.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == state.products.length) {
-          // Skeleton card mientras carga los siguientes 10
+          // Si falló cargar más, mostrar botón Reintentar en vez de skeleton infinito
+          if (state.hasLoadMoreError) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Text(
+                      'No se pudieron cargar más productos',
+                      style: TextStyle(fontSize: 13, color: Colors.red),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          ref.read(productsProvider.notifier).fetchMore(),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // Skeleton card mientras se descargan los siguientes 10
           final skeleton = Product(
             id: 9999,
             title: 'Cargando más productos...',
@@ -265,6 +313,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: ProductCard(product: skeleton),
           );
         }
+
         final product = state.products[index];
         return ProductCard(
           product: product,

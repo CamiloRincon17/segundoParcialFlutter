@@ -1,21 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:segundoparcialflutter/models/user.dart';
+import 'package:segundoparcialflutter/providers/products_provider.dart';
 import 'package:segundoparcialflutter/services/token_service.dart';
 
 export 'package:segundoparcialflutter/models/user.dart';
 
-// Estado de autenticación
+// Estado de sesión
 class AuthState {
   final User? user;
   final String? token;
   final bool isLoading;
-  final bool isInitializing;
 
   const AuthState({
     this.user,
     this.token,
     this.isLoading = false,
-    this.isInitializing = true,
   });
 
   bool get isAuthenticated => user != null && token != null;
@@ -24,7 +23,6 @@ class AuthState {
     User? user,
     String? token,
     bool? isLoading,
-    bool? isInitializing,
     bool clearUser = false,
     bool clearToken = false,
   }) {
@@ -32,7 +30,6 @@ class AuthState {
       user: clearUser ? null : (user ?? this.user),
       token: clearToken ? null : (token ?? this.token),
       isLoading: isLoading ?? this.isLoading,
-      isInitializing: isInitializing ?? this.isInitializing,
     );
   }
 }
@@ -50,20 +47,24 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final storedToken = await _tokenService.getToken();
       if (storedToken != null && storedToken.isNotEmpty) {
         final user = TokenService.getUserFromToken(storedToken);
-        return AuthState(
-          user: user,
-          token: storedToken,
-          isInitializing: false,
-        );
+        if (user != null) {
+          return AuthState(
+            user: user,
+            token: storedToken,
+          );
+        } else {
+          // Token expirado o inválido: limpiarlo
+          await _tokenService.clearToken();
+        }
       }
     } catch (_) {}
-    return const AuthState(isInitializing: false);
+    return const AuthState();
   }
 
-  // Login: primero intenta contra DummyJSON API, si falla valida localmente
+  // Login: intenta contra DummyJSON API primero; si falla, valida usuarios locales
   Future<bool> login(String emailOrUsername, String password) async {
-    final prev = state.value ?? const AuthState(isInitializing: false);
-    state = AsyncData(prev.copyWith(isLoading: true, isInitializing: false));
+    final prev = state.value ?? const AuthState();
+    state = AsyncData(prev.copyWith(isLoading: true));
 
     try {
       // 1. Intenta login con DummyJSON Auth API
@@ -73,23 +74,25 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       if (apiResult != null) {
         final apiToken = apiResult['accessToken']?.toString() ??
             apiResult['token']?.toString() ?? '';
-        final apiName = apiResult['firstName'] != null
-            ? '${apiResult['firstName']} ${apiResult['lastName'] ?? ''}'.trim()
+        final firstName = apiResult['firstName']?.toString() ?? '';
+        final lastName = apiResult['lastName']?.toString() ?? '';
+        final fullName = (firstName.isNotEmpty || lastName.isNotEmpty)
+            ? '$firstName $lastName'.trim()
             : apiResult['username']?.toString() ?? emailOrUsername;
         final apiEmail = apiResult['email']?.toString() ?? emailOrUsername;
+        final avatar = apiResult['image']?.toString() ?? 'https://i.pravatar.cc/150?img=12';
 
         final token = apiToken.isNotEmpty
             ? apiToken
-            : TokenService.generateToken(apiEmail, name: apiName);
+            : TokenService.generateToken(apiEmail, name: fullName, avatarUrl: avatar);
 
         await _tokenService.saveToken(token);
 
-        final user = User(name: apiName, email: apiEmail);
+        final user = User(name: fullName, email: apiEmail, avatarUrl: avatar);
         state = AsyncData(AuthState(
           user: user,
           token: token,
           isLoading: false,
-          isInitializing: false,
         ));
         return true;
       }
@@ -106,19 +109,20 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           user: user,
           token: token,
           isLoading: false,
-          isInitializing: false,
         ));
         return true;
       }
     } catch (_) {}
 
-    state = AsyncData(prev.copyWith(isLoading: false, isInitializing: false));
+    state = AsyncData(prev.copyWith(isLoading: false));
     return false;
   }
 
   Future<void> logout() async {
     await _tokenService.clearToken();
-    state = const AsyncData(AuthState(isInitializing: false));
+    // Reinicia el catálogo y elimina los productos creados localmente
+    ref.invalidate(productsProvider);
+    state = const AsyncData(AuthState());
   }
 }
 

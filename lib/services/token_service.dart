@@ -16,7 +16,11 @@ class TokenService {
           .post(
             Uri.parse('https://dummyjson.com/auth/login'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'username': username, 'password': password, 'expiresInMins': 10080}),
+            body: jsonEncode({
+              'username': username,
+              'password': password,
+              'expiresInMins': 10080,
+            }),
           )
           .timeout(const Duration(seconds: 10));
 
@@ -28,15 +32,15 @@ class TokenService {
   }
 
   // Genera un token JWT simulado (fallback para usuarios quemados locales)
-  static String generateToken(String email, {String? name}) {
+  static String generateToken(String email, {String? name, String? avatarUrl}) {
     final displayName = name ?? HardcodedData.getNameForEmail(email);
     final payload = {
       'sub': email,
+      'email': email,
       'name': displayName,
-      'iat': DateTime.now().millisecondsSinceEpoch,
-      'exp': DateTime.now()
-          .add(const Duration(days: 7))
-          .millisecondsSinceEpoch,
+      'image': avatarUrl ?? 'https://i.pravatar.cc/150?img=12',
+      'iat': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'exp': DateTime.now().add(const Duration(days: 7)).millisecondsSinceEpoch ~/ 1000,
       'issuer': 'segundoParcialFlutter_auth',
     };
     final jsonStr = jsonEncode(payload);
@@ -44,7 +48,7 @@ class TokenService {
     return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.$base64Payload.s3cur3_s1gn4tur3';
   }
 
-  // Extrae el usuario directamente del JWT
+  // Extrae el usuario directamente del JWT, validando la expiración (exp)
   static User? getUserFromToken(String token) {
     try {
       final parts = token.split('.');
@@ -52,13 +56,32 @@ class TokenService {
         final normalized = base64Url.normalize(parts[1]);
         final decoded = utf8.decode(base64Url.decode(normalized));
         final json = jsonDecode(decoded) as Map<String, dynamic>;
-        final email = json['sub'] as String? ??
-            json['email'] as String? ??
-            'admin@correo.com';
-        final name = json['name'] as String? ??
-            json['username'] as String? ??
-            email.split('@').first.toUpperCase();
-        return User(name: name, email: email);
+
+        // Validación de expiración de token
+        if (json['exp'] != null) {
+          final expNum = json['exp'] as num;
+          final expSeconds = expNum.toInt();
+          final expMs = expSeconds < 10000000000 ? expSeconds * 1000 : expSeconds;
+          final expiryDate = DateTime.fromMillisecondsSinceEpoch(expMs);
+
+          if (DateTime.now().isAfter(expiryDate)) {
+            debugPrint('⚠️ Token expirado: $expiryDate');
+            return null;
+          }
+        }
+
+        final email = json['email'] as String? ?? json['sub'] as String? ?? 'admin@correo.com';
+
+        // Reconstrucción del nombre completo (DummyJSON incluye firstName y lastName)
+        final firstName = json['firstName'] as String? ?? '';
+        final lastName = json['lastName'] as String? ?? '';
+        final fullName = (firstName.isNotEmpty || lastName.isNotEmpty)
+            ? '$firstName $lastName'.trim()
+            : json['name'] as String? ?? json['username'] as String? ?? email.split('@').first.toUpperCase();
+
+        final avatar = json['image'] as String? ?? 'https://i.pravatar.cc/150?img=12';
+
+        return User(name: fullName, email: email, avatarUrl: avatar);
       }
     } catch (_) {}
     return null;
@@ -67,7 +90,6 @@ class TokenService {
   // Guarda ÚNICAMENTE con FlutterSecureStorage bajo la clave 'token'
   Future<void> saveToken(String token) async {
     await storage.write(key: tokenKey, value: token);
-    // No se imprime el token por seguridad
     debugPrint('🔑 Token guardado en FlutterSecureStorage');
   }
 
@@ -87,9 +109,10 @@ class TokenService {
     } catch (_) {}
   }
 
-  // Verifica si el token existe
+  // Verifica si el token existe y no ha expirado
   Future<bool> hasValidToken() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    if (token == null || token.isEmpty) return false;
+    return getUserFromToken(token) != null;
   }
 }

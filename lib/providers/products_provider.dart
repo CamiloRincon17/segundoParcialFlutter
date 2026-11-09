@@ -7,6 +7,7 @@ class ProductsState {
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
+  final bool hasLoadMoreError;
   final String? errorMessage;
 
   const ProductsState({
@@ -14,6 +15,7 @@ class ProductsState {
     this.isLoading = true,
     this.isLoadingMore = false,
     this.hasMore = true,
+    this.hasLoadMoreError = false,
     this.errorMessage,
   });
 
@@ -22,14 +24,19 @@ class ProductsState {
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
+    bool? hasLoadMoreError,
     String? errorMessage,
     bool clearError = false,
+    bool clearLoadMoreError = false,
   }) {
     return ProductsState(
       products: products ?? this.products,
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
+      hasLoadMoreError: clearLoadMoreError
+          ? false
+          : (hasLoadMoreError ?? this.hasLoadMoreError),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
@@ -39,22 +46,32 @@ class ProductsNotifier extends Notifier<ProductsState> {
   static const int _pageSize = 10;
   final _api = ApiService();
 
+  // Contador exclusivo para la API (no se altera al agregar productos locales)
+  int _apiSkip = 0;
+
   @override
   ProductsState build() {
+    _apiSkip = 0;
     Future.microtask(fetchInitial);
     return const ProductsState(isLoading: true);
   }
 
   Future<void> fetchInitial() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearLoadMoreError: true,
+    );
     try {
       final items = await _api.getProducts(limit: _pageSize, skip: 0);
+      _apiSkip = items.length;
       state = ProductsState(
         products: items,
         isLoading: false,
         hasMore: items.length >= _pageSize,
       );
     } catch (e) {
+      _apiSkip = 0;
       state = ProductsState(
         isLoading: false,
         errorMessage: e.toString(),
@@ -66,21 +83,24 @@ class ProductsNotifier extends Notifier<ProductsState> {
   Future<void> fetchMore() async {
     if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
 
-    state = state.copyWith(isLoadingMore: true);
+    state = state.copyWith(isLoadingMore: true, clearLoadMoreError: true);
     try {
-      final skip = state.products.length;
-      final items = await _api.getProducts(limit: _pageSize, skip: skip);
+      final items = await _api.getProducts(limit: _pageSize, skip: _apiSkip);
+      _apiSkip += items.length;
       state = state.copyWith(
         products: [...state.products, ...items],
         isLoadingMore: false,
         hasMore: items.length >= _pageSize,
       );
     } catch (_) {
-      state = state.copyWith(isLoadingMore: false);
+      state = state.copyWith(
+        isLoadingMore: false,
+        hasLoadMoreError: true,
+      );
     }
   }
 
-  // Agrega el producto localmente al inicio (DummyJSON no persiste realmente)
+  // Agrega el producto nuevo creado al inicio sin desfasar el skip de la API
   void addProductLocally(Product product) {
     state = state.copyWith(products: [product, ...state.products]);
   }
@@ -88,4 +108,3 @@ class ProductsNotifier extends Notifier<ProductsState> {
 
 final productsProvider =
     NotifierProvider<ProductsNotifier, ProductsState>(ProductsNotifier.new);
-

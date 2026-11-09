@@ -17,9 +17,10 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
-  // Imagen de muestra de DummyJSON (no depende de FakeStoreAPI)
+  // Imagen de muestra real de DummyJSON (Beauty / Mascara)
   final _imageController = TextEditingController(
-    text: 'https://cdn.dummyjson.com/product-images/1/thumbnail.jpg',
+    text:
+        'https://cdn.dummyjson.com/product-images/beauty/essence-mascara-lash-princess/thumbnail.webp',
   );
 
   // Categorías reales de DummyJSON
