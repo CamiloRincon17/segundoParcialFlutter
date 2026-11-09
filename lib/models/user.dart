@@ -22,9 +22,10 @@ class HardcodedData {
   static const String password2 = '123456';
   static const String name2 = 'Uriel Mauricio';
 
-  // Obtener el nombre del usuario según su correo
+  // Obtener el nombre del usuario según su correo o usuario
   static String getNameForEmail(String inputEmail) {
-    if (inputEmail.trim().toLowerCase() == email2.toLowerCase()) {
+    final e = inputEmail.trim().toLowerCase();
+    if (e == email2.toLowerCase() || e == 'usuario2' || e == 'uriel') {
       return name2;
     }
     return name;
@@ -34,12 +35,19 @@ class HardcodedData {
   static bool validate(String inputEmail, String inputPassword) {
     final e = inputEmail.trim().toLowerCase();
     final p = inputPassword.trim();
-    if (e == email.toLowerCase() && (p == password || p == alternatePassword)) {
+
+    // Usuario 1: acepta 'admin@correo.com' o solo 'admin' o 'camilo'
+    if ((e == email.toLowerCase() || e == 'admin' || e == 'camilo') &&
+        (p == password || p == alternatePassword)) {
       return true;
     }
-    if (e == email2.toLowerCase() && p == password2) {
+
+    // Usuario 2: acepta 'usuario2@correo.com' o solo 'usuario2' o 'uriel'
+    if ((e == email2.toLowerCase() || e == 'usuario2' || e == 'uriel') &&
+        p == password2) {
       return true;
     }
+
     return false;
   }
 }

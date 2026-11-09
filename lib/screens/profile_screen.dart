@@ -135,7 +135,7 @@ class ProfileScreen extends ConsumerWidget {
                                 ScaffoldMessenger.of(context)
                                     .showSnackBar(
                                   const SnackBar(
-                                    content: Text('Token copiado'),
+                                    content: Text('Token copiado al portapapeles'),
                                     duration: Duration(seconds: 2),
                                   ),
                                 );
